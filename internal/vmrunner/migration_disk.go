@@ -12,41 +12,20 @@ import (
 	"syscall"
 
 	"srv/internal/coldstore"
+	"srv/internal/migrationdisk"
 	"srv/internal/storage"
 )
 
-// MigrationDisk describes immutable transfer objects, not a space reservation.
-// Base is retained at the destination; Disk is discarded after publication.
-type MigrationDisk struct {
-	Disk coldstore.Object  `json:"disk"`
-	Base *coldstore.Object `json:"base,omitempty"`
-}
-
-type MigrationDiskRequest struct {
-	Action       string                    `json:"action"`
-	Name         string                    `json:"name"`
-	InstanceID   string                    `json:"instance_id"`
-	Token        string                    `json:"token"`
-	ExpectedDisk storage.SubvolumeIdentity `json:"expected_disk"`
-	Transfer     MigrationDisk             `json:"transfer"`
-}
-
-type MigrationDiskResult struct {
-	Transfer          MigrationDisk `json:"transfer"`
-	BasePresent       bool          `json:"base_present"`
-	SerializedPayload bool          `json:"serialized_payload"`
-}
-
 type migrationDiskReceipt struct {
 	InstanceID string                    `json:"instance_id"`
-	Transfer   MigrationDisk             `json:"transfer"`
+	Transfer   migrationdisk.Transfer    `json:"transfer"`
 	LocalDisk  storage.SubvolumeIdentity `json:"local_disk"`
 }
 
 // MigrationDisk is an internal streaming RPC. Only the trusted frontend's
 // migration path may supply its input through srv; public import never does.
-func (c *Client) MigrationDisk(ctx context.Context, q MigrationDiskRequest, in io.Reader, out io.Writer) (MigrationDiskResult, error) {
-	var result MigrationDiskResult
+func (c *Client) MigrationDisk(ctx context.Context, q migrationdisk.Request, in io.Reader, out io.Writer) (migrationdisk.Result, error) {
+	var result migrationdisk.Result
 	metadata, err := json.Marshal(q)
 	if err != nil {
 		return result, err
@@ -81,7 +60,7 @@ func (c *Client) MigrationDisk(ctx context.Context, q MigrationDiskRequest, in i
 	return result, err
 }
 
-func (s *Server) migrationSource(q MigrationDiskRequest) string {
+func (s *Server) migrationSource(q migrationdisk.Request) string {
 	return filepath.Join(s.config.MigrationStoreDir, "sources", receiptKey(q.Name), q.Token)
 }
 
@@ -91,7 +70,7 @@ func (s *Server) migrationImportPath(name string) string {
 }
 
 func (s *Server) handleMigrationDisk(w http.ResponseWriter, r *http.Request) {
-	var q MigrationDiskRequest
+	var q migrationdisk.Request
 	metadata := r.Header.Get("X-Srv-Migration")
 	if r.Method != http.MethodPost || len(metadata) > 8192 || json.Unmarshal([]byte(metadata), &q) != nil ||
 		!validName.MatchString(q.Name) || !canonicalColdUUID(q.InstanceID) || !canonicalColdUUID(q.Token) {
@@ -149,7 +128,7 @@ func (s *Server) handleMigrationDisk(w http.ResponseWriter, r *http.Request) {
 	// Capability checks precede stopping/fencing the source and are valid while
 	// it is running. Every operation that touches its disk still requires idle.
 	if q.Action == "check" {
-		_ = json.NewEncoder(w).Encode(MigrationDiskResult{SerializedPayload: true})
+		_ = json.NewEncoder(w).Encode(migrationdisk.Result{SerializedPayload: true})
 		return
 	}
 	if err = s.storageIdleLocked(q.Name); err != nil {
@@ -173,8 +152,8 @@ func (s *Server) handleMigrationDisk(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-func (s *Server) migrationDiskLocked(ctx context.Context, q MigrationDiskRequest, in io.Reader) (MigrationDiskResult, func(io.Writer) error, error) {
-	var result MigrationDiskResult
+func (s *Server) migrationDiskLocked(ctx context.Context, q migrationdisk.Request, in io.Reader) (migrationdisk.Result, func(io.Writer) error, error) {
+	var result migrationdisk.Result
 	root := s.config.MigrationStoreDir
 	disk := filepath.Join(s.config.InstancesDir, q.Name, "disk")
 	source := s.migrationSource(q)

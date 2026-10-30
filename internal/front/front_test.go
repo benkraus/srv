@@ -15,8 +15,8 @@ import (
 
 	"srv/internal/coldstore"
 	"srv/internal/front"
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
-	"srv/internal/vmrunner"
 )
 
 type fake func(front.Host, []string, io.Reader, io.Writer) error
@@ -173,7 +173,7 @@ func (b *migrationBackend) run(h front.Host, args []string, in io.Reader, out io
 	if cmd == "--json" {
 		cmd = args[1]
 	}
-	var q vmrunner.MigrationDiskRequest
+	var q migrationdisk.Request
 	action := cmd
 	if cmd == "migration-disk" {
 		if len(args) < 2 {
@@ -276,14 +276,14 @@ func (b *migrationBackend) run(h front.Host, args []string, in io.Reader, out io
 			_, err := io.WriteString(out, `{}`)
 			return err
 		case "prepare":
-			return json.NewEncoder(out).Encode(vmrunner.MigrationDiskResult{Transfer: vmrunner.MigrationDisk{
+			return json.NewEncoder(out).Encode(migrationdisk.Result{Transfer: migrationdisk.Transfer{
 				Disk: coldstore.Object{ID: q.Token, Parent: "shared-base"}, Base: &coldstore.Object{ID: "shared-base"},
 			}})
 		case "base-present":
 			if q.Transfer.Base == nil || q.Transfer.Disk.ID != q.Token || q.Transfer.Disk.Parent != q.Transfer.Base.ID {
 				return errors.New("source transfer objects not forwarded to destination")
 			}
-			return json.NewEncoder(out).Encode(vmrunner.MigrationDiskResult{BasePresent: b.bases[q.Transfer.Base.ID]})
+			return json.NewEncoder(out).Encode(migrationdisk.Result{BasePresent: b.bases[q.Transfer.Base.ID]})
 		case "send-base", "send-disk", "metadata":
 			_, err := io.WriteString(out, q.Token)
 			return err

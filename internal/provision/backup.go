@@ -18,9 +18,9 @@ import (
 	"github.com/klauspost/compress/zstd"
 
 	"srv/internal/format"
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
 	"srv/internal/storage"
-	"srv/internal/vmrunner"
 )
 
 const (
@@ -85,7 +85,7 @@ type portableManifest struct {
 	ExportedAt     time.Time               `json:"exported_at"`
 	Instance       portableInstance        `json:"instance"`
 	Files          backupFiles             `json:"files"`
-	NativeDisk     *vmrunner.MigrationDisk `json:"native_disk,omitempty"`
+	NativeDisk     *migrationdisk.Transfer `json:"native_disk,omitempty"`
 }
 
 type portableInstance struct {
@@ -506,11 +506,11 @@ func (p *Provisioner) ExportInstance(ctx context.Context, name string, w io.Writ
 
 // ExportNativeMetadata retains the existing manifest/log framing. The disk
 // itself has already travelled through the privileged Send/Receive path.
-func (p *Provisioner) ExportNativeMetadata(ctx context.Context, name string, w io.Writer, transfer vmrunner.MigrationDisk) (PortableArtifactInfo, error) {
+func (p *Provisioner) ExportNativeMetadata(ctx context.Context, name string, w io.Writer, transfer migrationdisk.Transfer) (PortableArtifactInfo, error) {
 	return p.exportInstance(ctx, name, w, &transfer)
 }
 
-func (p *Provisioner) exportInstance(ctx context.Context, name string, w io.Writer, native *vmrunner.MigrationDisk) (PortableArtifactInfo, error) {
+func (p *Provisioner) exportInstance(ctx context.Context, name string, w io.Writer, native *migrationdisk.Transfer) (PortableArtifactInfo, error) {
 	inst, err := p.requireStoppedInstance(ctx, name)
 	if err != nil {
 		return PortableArtifactInfo{}, err
@@ -907,7 +907,7 @@ func (p *Provisioner) ImportInstanceWithOptions(ctx context.Context, actor model
 	}
 
 	if manifest.NativeDisk != nil {
-		if _, err := p.migrationDiskRPC(ctx, vmrunner.MigrationDiskRequest{Action: "publish", Name: imported.Name, InstanceID: imported.ID, Token: manifest.MigrationToken, Transfer: *manifest.NativeDisk}, nil, nil); err != nil {
+		if _, err := p.migrationDiskRPC(ctx, migrationdisk.Request{Action: "publish", Name: imported.Name, InstanceID: imported.ID, Token: manifest.MigrationToken, Transfer: *manifest.NativeDisk}, nil, nil); err != nil {
 			return model.Instance{}, PortableArtifactInfo{}, err
 		}
 	}
@@ -951,7 +951,7 @@ func (p *Provisioner) ImportInstanceWithOptions(ctx context.Context, actor model
 	if manifest.NativeDisk != nil {
 		// Publication and the SQLite receipt are durable. Cleanup failure must
 		// not turn the committed import into an uncommitted result.
-		if _, err := p.migrationDiskRPC(ctx, vmrunner.MigrationDiskRequest{Action: "discard", Name: imported.Name, InstanceID: imported.ID, Token: manifest.MigrationToken, Transfer: *manifest.NativeDisk}, nil, nil); err != nil {
+		if _, err := p.migrationDiskRPC(ctx, migrationdisk.Request{Action: "discard", Name: imported.Name, InstanceID: imported.ID, Token: manifest.MigrationToken, Transfer: *manifest.NativeDisk}, nil, nil); err != nil {
 			p.log.Warn("committed migration retains transfer object; administrator cleanup required", "name", imported.Name, "token", manifest.MigrationToken, "err", err)
 		}
 	}

@@ -30,6 +30,7 @@ import (
 	"srv/internal/config"
 	"srv/internal/front"
 	"srv/internal/host"
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
 	"srv/internal/provision"
 	"srv/internal/storage"
@@ -169,12 +170,12 @@ func TestFrontendColdMigrationOverSSH(t *testing.T) {
 			}
 			_ = json.NewEncoder(w).Encode(vmrunner.ColdStatus{Phase: "hot", Remote: false, JournalPresent: false})
 		case "/vm/migration-disk-v1":
-			var q vmrunner.MigrationDiskRequest
+			var q migrationdisk.Request
 			if err := json.Unmarshal([]byte(r.Header.Get("X-Srv-Migration")), &q); err != nil {
 				http.Error(w, err.Error(), 400)
 				return
 			}
-			result := vmrunner.MigrationDiskResult{SerializedPayload: true}
+			result := migrationdisk.Result{SerializedPayload: true}
 			switch q.Action {
 			case "check", "cleanup", "discard":
 			case "prepare":

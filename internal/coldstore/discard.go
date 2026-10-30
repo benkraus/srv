@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
-
-	"golang.org/x/sys/unix"
 )
 
 // DiscardObjects is a LOCAL administrator-only, irreversible recovery operation,
@@ -90,7 +88,7 @@ func DiscardObjects(ctx context.Context, root string, ids []string) error {
 		}
 		for _, id := range present {
 			stage := filepath.Join(root, ".stage-delete-"+id)
-			if err := unix.Renameat2(unix.AT_FDCWD, s.path(id), unix.AT_FDCWD, stage, unix.RENAME_NOREPLACE); err != nil {
+			if err := renameNoReplace(s.path(id), stage); err != nil {
 				return err
 			}
 		}

@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sys/unix"
 	"srv/internal/storage"
 )
 
@@ -334,7 +333,7 @@ func (c Client) Get(ctx context.Context, o Object, destDir, parentID string) (st
 	dest := filepath.Join(destDir, o.ID)
 	// Publish the ordinary container: RENAME_NOREPLACE on a read-only Btrfs
 	// subvolume can return EROFS. Keep the received disk immutable throughout.
-	if err := unix.Renameat2(unix.AT_FDCWD, stage, unix.AT_FDCWD, dest, unix.RENAME_NOREPLACE); err != nil {
+	if err := renameNoReplace(stage, dest); err != nil {
 		return "", err
 	}
 	if err := storage.SyncPath(destDir); err != nil {

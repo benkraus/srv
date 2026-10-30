@@ -16,7 +16,9 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
+
 	"srv/internal/coldstore"
+	"srv/internal/migrationdisk"
 	"srv/internal/storage"
 )
 
@@ -226,7 +228,7 @@ func TestPayloadWaitDoesNotBlockRunnerDrain(t *testing.T) {
 			data, _ := json.Marshal(q)
 			req := httptest.NewRequest(http.MethodPost, "/vm/cold-disk-v1", strings.NewReader(string(data)))
 			if action != "hydrate" {
-				metadata, _ := json.Marshal(MigrationDiskRequest{Action: action, Name: q.Name, InstanceID: q.InstanceID, Token: uuid.NewString()})
+				metadata, _ := json.Marshal(migrationdisk.Request{Action: action, Name: q.Name, InstanceID: q.InstanceID, Token: uuid.NewString()})
 				req = httptest.NewRequest(http.MethodPost, "/vm/migration-disk-v1", nil)
 				req.Header.Set("X-Srv-Migration", string(metadata))
 			}
@@ -588,7 +590,7 @@ func TestNativeMigrationSnapshotAndIncarnation(t *testing.T) {
 	id := f.ids[ino]
 	id.ParentUUID = base.UUID
 	f.ids[ino] = id
-	q := MigrationDiskRequest{Action: "prepare", Name: f.q.Name, InstanceID: f.q.InstanceID, Token: uuid.NewString(), ExpectedDisk: id}
+	q := migrationdisk.Request{Action: "prepare", Name: f.q.Name, InstanceID: f.q.InstanceID, Token: uuid.NewString(), ExpectedDisk: id}
 	check := q
 	check.Action = "check"
 	// An incoming transfer owns this namespace flock until its stream ends.
@@ -670,7 +672,7 @@ func TestNativeMigrationFilesystemIntegration(t *testing.T) {
 		code  int
 	}{{source, http.StatusOK}, {other, http.StatusConflict}} {
 		s.config.MigrationStoreDir = tc.store
-		q := MigrationDiskRequest{Action: "check", Name: "filesystem-check", InstanceID: uuid.NewString(), Token: uuid.NewString()}
+		q := migrationdisk.Request{Action: "check", Name: "filesystem-check", InstanceID: uuid.NewString(), Token: uuid.NewString()}
 		metadata, err := json.Marshal(q)
 		if err != nil {
 			t.Fatal(err)

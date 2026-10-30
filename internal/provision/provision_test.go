@@ -32,6 +32,7 @@ import (
 	"srv/internal/config"
 	"srv/internal/format"
 	"srv/internal/host"
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
 	"srv/internal/nethelper"
 	"srv/internal/storage"
@@ -737,7 +738,7 @@ func TestExportAndImportPortableArtifact(t *testing.T) {
 	// The public portable path must never turn an uploaded manifest into a
 	// privileged native-disk publication request, even for a valid archive.
 	nativeManifest := manifest
-	nativeManifest.NativeDisk = &vmrunner.MigrationDisk{}
+	nativeManifest.NativeDisk = &migrationdisk.Transfer{}
 	nativeStream := portableArtifactTestStream(t, nativeManifest, nil)
 	if _, _, err := dest.ImportInstance(ctx, model.Actor{}, bytes.NewReader(nativeStream)); err == nil || !strings.Contains(err.Error(), "trusted-frontend") {
 		t.Fatalf("public import accepted native metadata: %v", err)

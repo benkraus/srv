@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"srv/internal/coldstore"
+	"srv/internal/migrationdisk"
 	"srv/internal/storage"
 )
 
@@ -184,8 +186,8 @@ func TestPayloadBtrfsRunnerIntegration(t *testing.T) {
 	if err := coldstore.Send(ctx, object, snapshot, "", &stream); err != nil {
 		t.Fatal(err)
 	}
-	q := MigrationDiskRequest{Name: "native-target", InstanceID: uuid.NewString(), Token: token, Action: "receive-disk", Transfer: MigrationDisk{Disk: object}}
-	invoke := func(ctx context.Context, q MigrationDiskRequest, payload *bytes.Reader) *httptest.ResponseRecorder {
+	q := migrationdisk.Request{Name: "native-target", InstanceID: uuid.NewString(), Token: token, Action: "receive-disk", Transfer: migrationdisk.Transfer{Disk: object}}
+	invoke := func(ctx context.Context, q migrationdisk.Request, payload *bytes.Reader) *httptest.ResponseRecorder {
 		t.Helper()
 		wire, _ := json.Marshal(q)
 		req := httptest.NewRequest("POST", "/vm/migration-disk-v1", payload).WithContext(ctx)

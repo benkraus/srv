@@ -30,5 +30,5 @@ func CheckDiskSpace(path string, payload int64) error {
 	if fs.Bsize <= 0 || fs.Bavail > uint64(math.MaxInt64)/uint64(fs.Bsize) {
 		return fmt.Errorf("invalid available disk measurement at %s", path)
 	}
-	return CheckAvailableSpace(int64(fs.Bavail)*fs.Bsize, payload)
+	return CheckAvailableSpace(int64(fs.Bavail)*int64(fs.Bsize), payload)
 }

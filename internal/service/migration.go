@@ -9,8 +9,8 @@ import (
 
 	gssh "github.com/gliderlabs/ssh"
 
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
-	"srv/internal/vmrunner"
 )
 
 // handleMigrationDisk is reachable only after trusted-node forwarding checks.
@@ -23,7 +23,7 @@ func (a *App) handleMigrationDisk(sess gssh.Session, actor model.Actor, args []s
 		return 2, fmt.Errorf("invalid internal migration command")
 	}
 	data, err := base64.RawURLEncoding.DecodeString(args[1])
-	var q vmrunner.MigrationDiskRequest
+	var q migrationdisk.Request
 	if err != nil || json.Unmarshal(data, &q) != nil {
 		return 2, fmt.Errorf("invalid migration request")
 	}

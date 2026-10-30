@@ -2,8 +2,9 @@
 
 `srv-front` provides one SSH endpoint in front of independent `srv` hosts. It
 keeps only a static host configuration and its own Tailscale/SSH identity, not a
-VM registry. It can run on a small separate Linux server without KVM,
-Firecracker, a reflink filesystem, or the srv helper services.
+VM registry. It can run on a small separate Linux server or a Mac (see
+[Run on macOS](#run-on-macos)) without KVM, Firecracker, a reflink filesystem,
+or the srv helper services.
 
 Each backend still owns VM state, permissions, admission, images, pools, and
 backups. An unavailable frontend does not stop VMs; direct backend SSH remains
@@ -82,6 +83,58 @@ configured stable node IDs, then apply their usual `SRV_ALLOWED_USERS`,
 `SRV_ADMIN_USERS`, and per-instance ownership checks. Audit records retain the
 user identity, actual frontend peer address, and forwarding node ID. No SSH
 username grants delegation rights. A trusted frontend itself may be tagged.
+
+## Run on macOS
+
+`srv-front` builds for macOS; the frontend needs none of srv's Linux-only VM,
+storage, or network code. Cross-compile on any host (`arm64` for Apple silicon,
+`amd64` for Intel Macs), or build natively on the Mac:
+
+```bash
+GOOS=darwin GOARCH=arm64 go build -o srv-front ./cmd/srv-front
+```
+
+On the Mac, run it as a dedicated role account under launchd. Pick a free
+UID/GID below 500 (`dscl . -list /Users UniqueID`):
+
+```bash
+sudo dscl . -create /Groups/_srvfront PrimaryGroupID 450
+sudo dscl . -create /Users/_srvfront UniqueID 450
+sudo dscl . -create /Users/_srvfront PrimaryGroupID 450
+sudo dscl . -create /Users/_srvfront UserShell /usr/bin/false
+sudo dscl . -create /Users/_srvfront NFSHomeDirectory /var/empty
+sudo dscl . -create /Users/_srvfront IsHidden 1
+
+sudo install -m 0755 srv-front /usr/local/bin/srv-front
+sudo install -d -o _srvfront -g _srvfront -m 0700 /usr/local/var/srv-front
+sudo install -d -m 0755 /usr/local/var/log
+sudo install -o _srvfront -g _srvfront -m 0600 /dev/null /usr/local/var/log/srv-front.log
+```
+
+Create `/usr/local/etc/srv-front.json` as above with
+`"data_dir": "/usr/local/var/srv-front"`. The listener lives on the frontend's
+own tailnet address, so `:22` does not conflict with macOS Remote Login.
+
+launchd has no environment file. Join the tailnet once in the foreground with
+the credentials from above, and stop it after it logs its stable node ID; the
+node state in `data_dir` keeps the identity, so the daemon needs no credentials:
+
+```bash
+sudo -u _srvfront env TS_AUTHKEY=tskey-auth-... \
+  /usr/local/bin/srv-front --config /usr/local/etc/srv-front.json
+```
+
+Then install and start the daemon:
+
+```bash
+sudo install -m 0644 contrib/launchd/srv-front.plist /Library/LaunchDaemons/srv-front.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/srv-front.plist
+tail -f /usr/local/var/log/srv-front.log
+```
+
+Trust its node ID on each backend as described above. `sudo launchctl
+kickstart -k system/srv-front` restarts it after a configuration change;
+`sudo launchctl bootout system/srv-front` stops and unloads it.
 
 ## Commands and placement
 

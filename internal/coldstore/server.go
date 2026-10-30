@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"golang.org/x/sys/unix"
+
 	"srv/internal/storage"
 )
 
@@ -374,7 +375,7 @@ func (s server) put(ctx context.Context, o Object, in io.Reader) error {
 	if err := storage.SyncPath(stage); err != nil {
 		return err
 	}
-	if err := unix.Renameat2(unix.AT_FDCWD, stage, unix.AT_FDCWD, s.path(o.ID), unix.RENAME_NOREPLACE); err != nil {
+	if err := renameNoReplace(stage, s.path(o.ID)); err != nil {
 		return err
 	}
 	// Publication is the point of no return. Any following sync/SSH failure is
@@ -445,7 +446,7 @@ func (s server) delete(ctx context.Context, id string) error {
 	if _, err := s.deletionRecord(id, true); err != nil {
 		return err
 	}
-	if err := unix.Renameat2(unix.AT_FDCWD, s.path(id), unix.AT_FDCWD, stage, unix.RENAME_NOREPLACE); err != nil {
+	if err := renameNoReplace(s.path(id), stage); err != nil {
 		return err
 	}
 	// No removal before the rename is durable. Failures leave a recoverable

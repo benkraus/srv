@@ -19,8 +19,8 @@ import (
 	"srv/internal/format"
 	"srv/internal/host"
 	"srv/internal/identity"
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
-	"srv/internal/vmrunner"
 )
 
 type Host struct {
@@ -461,7 +461,7 @@ func (r *Router) migrate(ctx context.Context, a model.Actor, args []string, over
 		return fmt.Errorf("target ineligible: %s", p.Reason)
 	}
 	token := uuid.NewString()
-	q := vmrunner.MigrationDiskRequest{Action: "check", Name: name, InstanceID: v.ID, Token: token}
+	q := migrationdisk.Request{Action: "check", Name: name, InstanceID: v.ID, Token: token}
 	for _, h := range []Host{source, target} {
 		if _, err := r.commandJSON(ctx, h, a, migrationDiskArgs(q)); err != nil {
 			return fmt.Errorf("host %s native migration unavailable (source not prepared): %w", h.Name, err)
@@ -495,7 +495,7 @@ func (r *Router) migrate(ctx context.Context, a model.Actor, args []string, over
 	if err != nil {
 		return err
 	}
-	var transfer vmrunner.MigrationDiskResult
+	var transfer migrationdisk.Result
 	if err = json.Unmarshal(data, &transfer); err != nil {
 		return err
 	}
@@ -508,7 +508,7 @@ func (r *Router) migrate(ctx context.Context, a model.Actor, args []string, over
 	if err != nil {
 		return err
 	}
-	var base vmrunner.MigrationDiskResult
+	var base migrationdisk.Result
 	if err = json.Unmarshal(data, &base); err != nil {
 		return err
 	}
@@ -566,7 +566,7 @@ func (r *Router) migrate(ctx context.Context, a model.Actor, args []string, over
 	return nil
 }
 
-func migrationDiskArgs(q vmrunner.MigrationDiskRequest) []string {
+func migrationDiskArgs(q migrationdisk.Request) []string {
 	data, _ := json.Marshal(q) // This concrete struct contains no unsupported JSON types.
 	return []string{"migration-disk", base64.RawURLEncoding.EncodeToString(data)}
 }

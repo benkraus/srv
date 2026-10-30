@@ -8,6 +8,8 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	"srv/internal/format"
 )
 
@@ -138,9 +140,9 @@ func ReadOSInfo() OSInfo {
 		info.Name = parseOSRelease(string(data))
 	}
 
-	var uname syscall.Utsname
-	if err := syscall.Uname(&uname); err == nil {
-		info.Kernel = int8ToString(uname.Release[:])
+	var uname unix.Utsname
+	if err := unix.Uname(&uname); err == nil {
+		info.Kernel = unix.ByteSliceToString(uname.Release[:])
 	}
 
 	return info
@@ -163,17 +165,6 @@ func parseOSRelease(data string) string {
 		return name + " " + version
 	}
 	return name
-}
-
-func int8ToString(arr []int8) string {
-	b := make([]byte, 0, len(arr))
-	for _, v := range arr {
-		if v == 0 {
-			break
-		}
-		b = append(b, byte(v))
-	}
-	return string(b)
 }
 
 func ReadCPUInfo() CPUInfo {

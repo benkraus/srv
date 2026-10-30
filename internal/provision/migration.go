@@ -8,17 +8,17 @@ import (
 	"io"
 	"path/filepath"
 
+	"srv/internal/migrationdisk"
 	"srv/internal/model"
 	"srv/internal/storage"
-	"srv/internal/vmrunner"
 )
 
-func (p *Provisioner) migrationDiskRPC(ctx context.Context, q vmrunner.MigrationDiskRequest, in io.Reader, out io.Writer) (vmrunner.MigrationDiskResult, error) {
+func (p *Provisioner) migrationDiskRPC(ctx context.Context, q migrationdisk.Request, in io.Reader, out io.Writer) (migrationdisk.Result, error) {
 	runner, ok := p.vmRunner.(interface {
-		MigrationDisk(context.Context, vmrunner.MigrationDiskRequest, io.Reader, io.Writer) (vmrunner.MigrationDiskResult, error)
+		MigrationDisk(context.Context, migrationdisk.Request, io.Reader, io.Writer) (migrationdisk.Result, error)
 	})
 	if !ok {
-		return vmrunner.MigrationDiskResult{}, errors.New("runner does not support native migration")
+		return migrationdisk.Result{}, errors.New("runner does not support native migration")
 	}
 	return runner.MigrationDisk(ctx, q, in, out)
 }
@@ -26,30 +26,30 @@ func (p *Provisioner) migrationDiskRPC(ctx context.Context, q vmrunner.Migration
 // TransferMigrationDisk is called under the service's instance lock, only for
 // native commands from an authenticated trusted frontend. Source operations
 // additionally require the durable prepared migration fence and its token.
-func (p *Provisioner) TransferMigrationDisk(ctx context.Context, q vmrunner.MigrationDiskRequest, in io.Reader, out io.Writer) (vmrunner.MigrationDiskResult, error) {
+func (p *Provisioner) TransferMigrationDisk(ctx context.Context, q migrationdisk.Request, in io.Reader, out io.Writer) (migrationdisk.Result, error) {
 	switch q.Action {
 	case "prepare", "send-base", "send-disk", "cleanup":
 		inst, err := p.requireStoppedInstance(ctx, q.Name)
 		if err != nil {
-			return vmrunner.MigrationDiskResult{}, err
+			return migrationdisk.Result{}, err
 		}
 		m, err := p.store.GetMigration(ctx, inst.ID)
 		if err != nil {
-			return vmrunner.MigrationDiskResult{}, err
+			return migrationdisk.Result{}, err
 		}
 		if m.Token != q.Token || (m.Phase != "prepared" && !(q.Action == "cleanup" && m.Phase == "completed")) {
-			return vmrunner.MigrationDiskResult{}, errors.New("native transfer requires the matching prepared migration")
+			return migrationdisk.Result{}, errors.New("native transfer requires the matching prepared migration")
 		}
 		q.InstanceID = inst.ID
 		if q.Action == "prepare" {
 			q.ExpectedDisk, err = storage.ValidateDiskSubvolume(ctx, filepath.Dir(inst.RootFSPath))
 			if err != nil {
-				return vmrunner.MigrationDiskResult{}, err
+				return migrationdisk.Result{}, err
 			}
 		}
 	case "check", "base-present", "receive-base", "receive-disk":
 	default:
-		return vmrunner.MigrationDiskResult{}, errors.New("unsupported native transfer action")
+		return migrationdisk.Result{}, errors.New("unsupported native transfer action")
 	}
 	return p.migrationDiskRPC(ctx, q, in, out)
 }
